@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Modal
+  Modal,
+  Platform
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 const App = () => {
   const [tasks, setTasks] = useState([]);
@@ -25,6 +27,7 @@ const App = () => {
   const [showManageCategoriesModal, setShowManageCategoriesModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categories, setCategories] = useState(['Tümü', 'İş', 'Kişisel', 'Alışveriş', 'Sağlık', 'Diğer']);
+  const inputRef = useRef(null);
 
   const saveTasks = async (newTasks) => {
     try {
@@ -80,6 +83,11 @@ const App = () => {
       setTasks(newTasks);
       saveTasks(newTasks);
       setInputText('');
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
     }
   };
 
@@ -118,18 +126,27 @@ const App = () => {
   };
 
   const deleteTask = (id) => {
-    Alert.alert(
-      'Görevi Sil',
-      'Bu görevi silmek istediğinizden emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Sil', onPress: () => {
-          const newTasks = tasks.filter(task => task.id !== id);
-          setTasks(newTasks);
-          saveTasks(newTasks);
-        }}
-      ]
-    );
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Bu görevi silmek istediğinizden emin misiniz?');
+      if (confirmed) {
+        const newTasks = tasks.filter(task => task.id !== id);
+        setTasks(newTasks);
+        saveTasks(newTasks);
+      }
+    } else {
+      Alert.alert(
+        'Görevi Sil',
+        'Bu görevi silmek istediğinizden emin misiniz?',
+        [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Sil', onPress: () => {
+            const newTasks = tasks.filter(task => task.id !== id);
+            setTasks(newTasks);
+            saveTasks(newTasks);
+          }}
+        ]
+      );
+    }
   };
 
   const startEditTask = (task) => {
@@ -191,25 +208,52 @@ const App = () => {
       ? `"${categoryToDelete}" kategorisini silmek istediğinizden emin misiniz?\n\nBu kategoriye bağlı ${taskCount} görev de silinecek.`
       : `"${categoryToDelete}" kategorisini silmek istediğinizden emin misiniz?`;
     
-    const confirmed = window.confirm(message);
-    
-    if (confirmed) {
-      // Kategorideki görevleri sil
-      const newTasks = tasks.filter(task => task.category !== categoryToDelete);
-      setTasks(newTasks);
-      saveTasks(newTasks);
-      
-      // Kategoriyi sil
-      const newCategories = categories.filter(cat => cat !== categoryToDelete);
-      setCategories(newCategories);
-      saveCategories(newCategories);
-      
-      // Eğer silinen kategori seçiliyse, İş kategorisine geç
-      if (selectedCategory === categoryToDelete) {
-        setSelectedCategory('İş');
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(message);
+      if (confirmed) {
+        // Kategorideki görevleri sil
+        const newTasks = tasks.filter(task => task.category !== categoryToDelete);
+        setTasks(newTasks);
+        saveTasks(newTasks);
+        
+        // Kategoriyi sil
+        const newCategories = categories.filter(cat => cat !== categoryToDelete);
+        setCategories(newCategories);
+        saveCategories(newCategories);
+        
+        // Eğer silinen kategori seçiliyse, İş kategorisine geç
+        if (selectedCategory === categoryToDelete) {
+          setSelectedCategory('İş');
+        }
+        
+        console.log('Category deleted:', categoryToDelete);
       }
-      
-      console.log('Category deleted:', categoryToDelete);
+    } else {
+      Alert.alert(
+        'Kategori Sil',
+        message,
+        [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Sil', style: 'destructive', onPress: () => {
+            // Kategorideki görevleri sil
+            const newTasks = tasks.filter(task => task.category !== categoryToDelete);
+            setTasks(newTasks);
+            saveTasks(newTasks);
+            
+            // Kategoriyi sil
+            const newCategories = categories.filter(cat => cat !== categoryToDelete);
+            setCategories(newCategories);
+            saveCategories(newCategories);
+            
+            // Eğer silinen kategori seçiliyse, İş kategorisine geç
+            if (selectedCategory === categoryToDelete) {
+              setSelectedCategory('İş');
+            }
+            
+            console.log('Category deleted:', categoryToDelete);
+          }}
+        ]
+      );
     }
   };
 
@@ -217,7 +261,7 @@ const App = () => {
     <View style={styles.container}>
       <StatusBar style="auto" />
       
-      <Text style={styles.versionText}>Simple TODO v1.0</Text>
+      <Text style={styles.versionText}>Simple TODO v{Constants.expoConfig?.version || '1.0.0'}</Text>
 
       <TouchableOpacity 
         style={styles.categoryButton} 
@@ -229,6 +273,7 @@ const App = () => {
       {selectedCategory !== 'Tümü' && (
         <View style={styles.inputSection}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             placeholder="Yeni görev ekle..."
             value={inputText}
@@ -270,7 +315,32 @@ const App = () => {
         {Object.entries(getTasksByCategory()).map(([category, categoryTasks]) => (
           categoryTasks.length > 0 && (
             <View key={category}>
-              <Text style={styles.categoryHeader}>{category}</Text>
+              {(() => {
+                if (selectedCategory === 'Tümü') {
+                  const completedCount = categoryTasks.filter(t => t.completed).length;
+                  const totalCount = categoryTasks.length;
+                  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                  
+                  return (
+                    <View style={styles.categoryHeaderContainer}>
+                      <Text style={styles.categoryHeader}>{category}</Text>
+                      <View style={styles.categoryProgressContainer}>
+                        <View style={styles.categoryProgressBar}>
+                          <View 
+                            style={[
+                              styles.categoryProgressFill, 
+                              { width: `${percentage}%` }
+                            ]} 
+                          />
+                        </View>
+                        <Text style={styles.categoryProgressText}>{percentage}%</Text>
+                      </View>
+                    </View>
+                  );
+                } else {
+                  return <Text style={styles.categoryHeader}>{category}</Text>;
+                }
+              })()}
               {categoryTasks.map(task => (
                 <View key={task.id} style={styles.taskItem}>
                   {editingTask === task.id ? (
@@ -656,6 +726,35 @@ const styles = StyleSheet.create({
     marginTop: 15,
     marginBottom: 10,
     marginLeft: 5,
+  },
+  categoryHeaderContainer: {
+    marginTop: 15,
+    marginBottom: 10,
+    marginLeft: 5,
+  },
+  categoryProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    gap: 8,
+  },
+  categoryProgressBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: '#E5E5E7',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  categoryProgressFill: {
+    height: '100%',
+    backgroundColor: '#34C759',
+    borderRadius: 2,
+  },
+  categoryProgressText: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: 'bold',
+    minWidth: 30,
   },
   modalOverlay: {
     flex: 1,

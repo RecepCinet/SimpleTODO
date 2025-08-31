@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npm start)",
-      "Bash(npx expo start:*)"
+      "Bash(npx expo start:*)",
+      "Read(c:\\Users\\u\\Documents\\ShareX\\Screenshots\\2025-08/**)",
+      "Bash(git restore:*)",
+      "Bash(npm install:*)",
+      "Bash(npx expo r:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": []
