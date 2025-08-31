@@ -216,6 +216,8 @@ const App = () => {
   return (
     <View style={styles.container}>
       <StatusBar style="auto" />
+      
+      <Text style={styles.versionText}>Simple TODO v1.0</Text>
 
       <TouchableOpacity 
         style={styles.categoryButton} 
@@ -491,6 +493,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     paddingTop: 50,
     paddingHorizontal: 20,
+  },
+  versionText: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    fontSize: 10,
+    color: '#999',
+    zIndex: 1000,
   },
   inputSection: {
     flexDirection: 'row',
